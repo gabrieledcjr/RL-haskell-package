@@ -4,7 +4,8 @@ module QLearning
 , State
 , Action
 , qLearn
---, pickAction
+, pickAction
+, learn
 --, myGlobalVar
 --, createHash
 ) where
@@ -24,10 +25,10 @@ type HashTable k v = H.BasicHashTable k v
 -- processStep
 -- evaluateAction
 
-data Params = Params { alpha :: Float     -- learning rate
-                     , gamma :: Float     -- discount factor
-                     , tau   :: Float     -- decay
-                     , eps   :: Float     -- exploration rate
+data Params = Params { alpha :: Double     -- learning rate
+                     , gamma :: Double     -- discount factor
+                     , tau   :: Double     -- decay
+                     , eps   :: Double     -- exploration rate
                      } deriving (Show, Eq, Ord)
 
 type State  = String
@@ -36,13 +37,14 @@ type Action = String
 
 data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
 
-initV = 0.0
+initV  = 0.0
+params = Params {alpha=0.03, gamma=1, tau=0.9, eps=0.1}
 
 -- Program can only work with known state space
 -- Load all state space in a list and convert it to Data.Map
 
-qLearn a g t e = do qT <- createQT
-                    return (qT, Params{alpha=a, gamma=g, tau=t, eps=e})
+qLearn = do qT <- createQT
+            return qT
 
 createQT :: IO (HashTable String Double)
 createQT = do qT <- H.new
@@ -50,45 +52,58 @@ createQT = do qT <- H.new
 
 -- s1(current state), a1(current action), 
 -- r(reward), s2(next state)
---learn s1 a1 r s2 = do 
+learn s1 a1 r s2 qT numA = do (qT, qVals)  <- checkQs s2 [1..numA] qT []
+                              print (reverse qVals)
+                              print a1
+                              (maxA, maxQ) <- getMax (zip [1..] (reverse qVals)) 0 []
+                              qT           <- learnQ s1 a1 (r+gm*maxQ) qT
+                              return qT
+                              where gm = (gamma params)
 
-learnQ s a val alpha qT = do qVal <- H.lookup qT key
-                             qT   <- updateQ qVal qT
-                             return qT
-                             where key = (show a) ++ s
-                                   updateQ qVal qT = 
-                                         case qVal of
-                                           Nothing -> do H.insert qT key val
-                                                         return qT
-                                           Just oldv -> do H.insert qT key (oldv+alpha*(val-oldv))
-                                                           return qT
+learnQ s a val qT = do qVal <- H.lookup qT key
+                       qT   <- updateQ qVal qT
+                       return qT
+                       where key = (show a) ++ s
+                             updateQ qVal qT = 
+                                     case qVal of
+                                      Nothing   -> do H.insert qT key val
+                                                      return qT
+                                      Just oldv -> do H.insert qT key (oldv+al*(val-oldv))
+                                                      b <- H.lookup qT key
+                                                      return qT
+                                                      where al = (alpha params)
 
-pickAction g numA ep qT = do rNum <- randomIO :: IO Float
-                             rInt <- randomIO :: IO Int
-                             (qT, action) <- pickAction' g numA ep qT rNum rInt
-                             return (qT, action)
+pickAction g numA qT = do rNum         <- randomIO :: IO Double
+                          rInt         <- randomIO :: IO Int
+                          (qT, action) <- pickAction' g numA qT rNum rInt
+                          return (qT, action)
 
-pickAction' g numA ep qT rNum rInt
-    | rNum < ep  = return (qT, action1)
+pickAction' g numA qT rNum rInt
+    | rNum < ep  = do print "Exploring"
+                      return (qT, action1)
     | otherwise  = do (qT, qVals) <- checkQs g [1..numA] qT []
-                      maxQ <- getMax (zip [1..] (reverse qVals)) 0 []
-                      rInt <- randomIO :: IO Int
-                      action2 <- bestAction maxQ (length maxQ) rInt
+                      print (zip [1..] (reverse qVals))
+                      (maxA,_)    <- getMax (zip [1..] (reverse qVals)) 0 []
+                      print maxA
+                      rInt        <- randomIO :: IO Int
+                      action2     <- bestAction maxA (length maxA) rInt
+                      print "Exploiting"
                       return (qT, action2)
                       where action1 = (rInt `mod` numA) + 1
+                            ep      = (eps params)
 
 
-bestAction maxQ len rInt = return (head action)
-                           where maxQz = zip [1..] maxQ
+bestAction maxA len rInt = return (head action)
+                           where maxAz = zip [1..] maxA
                                  ranIdx = (rInt `mod` len) + 1
-                                 action = [a | (idx,a) <- maxQz, idx==ranIdx]
+                                 action = [a | (idx,a) <- maxAz, idx==ranIdx]
 
 
 checkQs _ []     qT xs = return (qT, xs)
 checkQs s (a:as) qT xs = do (qT, val) <- getQ s a qT
                             checkQs s as qT (val:xs)
 
-getQ s a qT = do qVal <- H.lookup qT key
+getQ s a qT = do qVal        <- H.lookup qT key
                  (qT, qVal') <- checkQT qVal qT
                  return (qT, qVal')
                  where key = (show a) ++ s
@@ -98,12 +113,12 @@ getQ s a qT = do qVal <- H.lookup qT key
                                          Just x  -> return (qT, x)
 
 
-getMax []     _   maxQ = return maxQ
-getMax (x:xs) max maxQ
-    | maxQ == [] ||
-      max  == val   = getMax xs val (idx:maxQ)
+getMax []     max maxA = return (maxA, max)
+getMax (x:xs) max maxA
+    | maxA == [] ||
+      max  == val   = getMax xs val (idx:maxA)
     | max  <  val   = getMax xs val (idx:[])
-    | otherwise     = getMax xs max maxQ
+    | otherwise     = getMax xs max maxA
                       where val = snd x
                             idx = fst x
 
