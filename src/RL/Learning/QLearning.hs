@@ -48,6 +48,20 @@ createQT :: IO (HashTable String Double)
 createQT = do qT <- H.new
               return qT
 
+-- s1(current state), a1(current action), 
+-- r(reward), s2(next state)
+--learn s1 a1 r s2 = do 
+
+learnQ s a val alpha qT = do qVal <- H.lookup qT key
+                             qT   <- updateQ qVal qT
+                             return qT
+                             where key = (show a) ++ s
+                                   updateQ qVal qT = 
+                                         case qVal of
+                                           Nothing -> do H.insert qT key val
+                                                         return qT
+                                           Just oldv -> do H.insert qT key (oldv+alpha*(val-oldv))
+                                                           return qT
 
 pickAction g numA ep qT = do rNum <- randomIO :: IO Float
                              rInt <- randomIO :: IO Int
@@ -93,6 +107,3 @@ getMax (x:xs) max maxQ
                       where val = snd x
                             idx = fst x
 
--- s1(current state), a1(current action), 
--- r(reward), s2(next state)
---learn s1 a1 r s2 = do 
