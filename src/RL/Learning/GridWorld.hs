@@ -37,7 +37,7 @@ gridWorld = [ sp, sp, sp, sp, sp
 goal  = 4
 start = 20
 --nDelay = 250000
-nDelay = 100000
+nDelay = 80000
 
 -- c(columns), r(rows), cur(current), gl(goal)
 data World = World{state :: [Char], -- state of the world

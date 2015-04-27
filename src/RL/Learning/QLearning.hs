@@ -38,7 +38,7 @@ type Action = String
 data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
 
 initV  = 0.0
-params = Params {alpha=0.03, gamma=1, tau=0.9, eps=0.1}
+params = Params {alpha=0.2, gamma=0.8, tau=0.9, eps=0.3}
 
 -- Program can only work with known state space
 -- Load all state space in a list and convert it to Data.Map
