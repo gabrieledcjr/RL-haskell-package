@@ -1,14 +1,20 @@
-module RL.Learning.QLearning
+--module RL.Learning.QLearning
+module QLearning
 ( Params
 , State
 , Action
+--, myGlobalVar
+--, createHash
 ) where
 
-
 import Control.Monad
-import qualified Data.HashTable.IO as H
-import qualified Data.Map as Map
+import Data.IORef
+import System.IO.Unsafe
 
+import qualified Data.HashTable.IO as H
+
+
+type HashTable k v = H.BasicHashTable k v
 
 -- alpha, gamma, tau, epsilon
 -- startEpisode
@@ -24,25 +30,15 @@ data Params = Params { alpha :: Float     -- learning rate
 type State  = String
 type Action = String
 
-type HashTable k v = H.BasicHashTable k v
 
 data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
-
-
-test :: IO (HashTable String Float)
-test = do
-        ht <- H.new
-        H.insert ht "Test" 12
-        value <- H.lookup ht "Test"
-        putStrLn . show $ value
-        return ht
-
-myMap = Map.empty :: Map.Map String Float
-
-myMap' = Map.insert "Foo" 12.12 myMap
 
 -- Program can only work with known state space
 -- Load all state space in a list and convert it to Data.Map
 
 
+--getQ s a qT = do 
 
+-- s1(current state), a1(current action), 
+-- r(reward), s2(next state)
+--learn s1 a1 r s2 = do 

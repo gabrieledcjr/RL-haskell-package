@@ -7,9 +7,10 @@ import Text.Printf
 import Control.Monad
 import Control.Concurrent.Thread.Delay
 import Control.Lens  -- replace element
+import qualified QLearning as QLearn
 
-data Cell = Cell { x :: Int, y :: Int } deriving (Show, Eq, Ord)
-data Grid = Grid [Cell] deriving (Show)
+--data Cell = Cell { x :: Int, y :: Int } deriving (Show, Eq, Ord)
+--data Grid = Grid [Cell] deriving (Show)
 
 cols = 10
 rows = 7
@@ -26,6 +27,15 @@ goal  = 9
 start = 60
 nDelay = 500000
 
+-- c(columns), r(rows), cur(current), gl(goal)
+data World = World{state :: [Char], -- state of the world
+                      c  :: Int,    -- columns
+                      r  :: Int,    -- rows
+                    cur  :: Int,    -- current pose of agent
+                     gl  :: Int}    -- goal pose
+                   deriving (Show, Eq, Ord)
+
+
 up    = 1
 down  = 2
 left  = 3
@@ -37,9 +47,9 @@ testActions = [left, down, up, up, right, right, right, right, right, left, righ
 
 
 -- print GridWorld
-printGrid [] _    = do putStr "\ESC[1]"
+printGrid [] _    = do putStrLn " "
                        putStrLn " "
-printGrid xs cols = do putStrLn     (take cols xs)
+printGrid xs cols = do putStrLn  (take cols xs)
                        printGrid (drop cols xs) cols
 
 strAction a
@@ -50,6 +60,11 @@ strAction a
     | otherwise = "Invalid!"
 
 
+setup xs s g = do t1 <- updateWorld xs s '*'
+                  t2 <- updateWorld t1 g '+'
+                  --return t2
+                  return (World{state = t2, c = cols, r = rows, cur = s, gl = g})
+
 -- train function
 train 0    _   = putStrLn "Program ends"
 train reps len = do print   ("REPS", reps)
@@ -59,46 +74,37 @@ train reps len = do print   ("REPS", reps)
 trainEp 0      = putStrLn "End training"
 trainEp length = do printf "%s %d\n" "Start Episode #" length
                     world <- setup gridWorld start goal
-                    printGrid world cols
+                    printGrid (state world) (c world)
                     delay nDelay
-                    episode' testActions world start
+                    episode' testActions world
                     putStrLn "End episode"
                     trainEp (length - 1)
 
 -- episode function
-episode []     _ _ = return ()
-episode (a:as) w s = do printf "%s %s\n" "MOVE:" (strAction a)
-                        (w,s) <- step w a s
-                        printGrid w cols
-                        delay nDelay
-                        episode as w s
-
-episode' xs w s
-    | isGoal s          = do printf "%s %d\n" "REWARD: " (r::Int)
+episode' xs w
+    | isGoal (cur w)    = do printf "%s %d\n" "REWARD: " (r::Int)
                              putStrLn "Win"
     | not (null xs)     = do printf "%s %s\n" "MOVE: " (strAction a)
-                             (w,s) <- step w a s
-                             printGrid w cols
+                             w <- step w a
+                             printGrid (state w) (c w)
                              printf "%s %d\n" "REWARD: " (r::Int)
                              delay nDelay
-                             episode' (tail xs) w s
+                             episode' (tail xs) w
     | otherwise         = return ()
                           where a = head xs
-                                r = getReward s
+                                r = getReward (cur w)
 
 
 updateWorld xs idx val = return world
                          where world = xs & element idx .~ val
 
-setup xs s g = do t1 <- updateWorld xs s '*'
-                  t2 <- updateWorld t1 g '+'
-                  return t2
 
-step xs a s = do t1 <- updateWorld xs s sp
-                 -- check if is win
-                 t2  <- updateWorld t1 s' '*'
-                 return (t2,s')
-                 where s' = getIndex a s
+step w a = do t1 <- updateWorld (state w) (cur w) sp
+              -- check if is win
+              t2  <- updateWorld t1 s' '*'
+              return (World{state=t2, c=(c w), r=(r w), cur=s', gl=(gl w)})
+              --return (t2,s')
+              where s' = getIndex a (cur w)
 
 isGoal s = if s == goal then True else False
 
