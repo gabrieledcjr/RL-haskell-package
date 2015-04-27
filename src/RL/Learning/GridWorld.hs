@@ -41,6 +41,7 @@ down  = 2
 left  = 3
 right = 4
 actions = [up, down, left, right]
+nactions = 4
 
 testActions = [left, down, up, up, right, right, right, right, right, left, right, right, up, up, up, up, right, right, right]
 
@@ -74,14 +75,15 @@ train reps len = do print   ("REPS", reps)
 trainEp 0      = putStrLn "End training"
 trainEp length = do printf "%s %d\n" "Start Episode #" length
                     world <- setup gridWorld start goal
+                    (qT, p) <- QLearn.qLearn 0.1 0.998 0.9 0.05
                     printGrid (state world) (c world)
                     delay nDelay
-                    episode' testActions world
+                    episode' world (qT, p)
                     putStrLn "End episode"
                     trainEp (length - 1)
 
 -- episode function
-episode' xs w
+episode' w (qT, p)
     | isGoal (cur w)    = do printf "%s %d\n" "REWARD: " (r::Int)
                              putStrLn "Win"
     | not (null xs)     = do printf "%s %s\n" "MOVE: " (strAction a)
@@ -89,10 +91,10 @@ episode' xs w
                              printGrid (state w) (c w)
                              printf "%s %d\n" "REWARD: " (r::Int)
                              delay nDelay
-                             episode' (tail xs) w
+                             episode' w (qT, p)
     | otherwise         = return ()
-                          where a = head xs
-                                r = getReward (cur w)
+                          where r = getReward (cur w)
+                                a = QLearn.pickAction (grid w) nactions (eps p) qT
 
 
 updateWorld xs idx val = return world

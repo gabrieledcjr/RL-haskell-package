@@ -22,3 +22,13 @@ foo = do
                                             return (ht, 0.0)
                               Just x -> return (ht, x)
 
+
+findMax []     _   maxQ    = return maxQ
+findMax (x:xs) max maxQ
+    | maxQ == [] ||
+      max  == value = findMax xs value (idx:maxQ)
+    | max < value   = findMax xs value (idx:[])
+    | otherwise     = findMax xs max maxQ
+                      where value = snd x
+                            idx   = fst x
+
