@@ -18,24 +18,17 @@ import System.Random
 import qualified Data.HashTable.IO as H
 
 
-type HashTable k v = H.BasicHashTable k v
-
--- alpha, gamma, tau, epsilon
--- startEpisode
--- processStep
--- evaluateAction
-
 data Params = Params { alpha :: Double     -- learning rate
                      , gamma :: Double     -- discount factor
                      , tau   :: Double     -- decay
                      , eps   :: Double     -- exploration rate
                      } deriving (Show, Eq, Ord)
+data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
 
+type HashTable k v = H.BasicHashTable k v
 type State  = String
 type Action = String
 
-
-data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
 
 initV  = 0.0
 params = Params {alpha=0.2, gamma=0.8, tau=0.9, eps=0.3}
@@ -43,7 +36,8 @@ params = Params {alpha=0.2, gamma=0.8, tau=0.9, eps=0.3}
 -- Program can only work with known state space
 -- Load all state space in a list and convert it to Data.Map
 
-qLearn = do qT <- createQT
+qLearn :: IO (HashTable String Double)
+qLearn = do qT <- H.new
             return qT
 
 createQT :: IO (HashTable String Double)
@@ -56,9 +50,9 @@ learn s1 a1 r s2 qT numA = do (qT, qVals)  <- checkQs s2 [1..numA] qT []
                               print (reverse qVals)
                               print a1
                               (maxA, maxQ) <- getMax (zip [1..] (reverse qVals)) 0 []
+			      let gm = (gamma params)
                               qT           <- learnQ s1 a1 (r+gm*maxQ) qT
                               return qT
-                              where gm = (gamma params)
 
 learnQ s a val qT = do qVal <- H.lookup qT key
                        qT   <- updateQ qVal qT
@@ -68,10 +62,10 @@ learnQ s a val qT = do qVal <- H.lookup qT key
                                      case qVal of
                                       Nothing   -> do H.insert qT key val
                                                       return qT
-                                      Just oldv -> do H.insert qT key (oldv+al*(val-oldv))
+                                      Just oldv -> do let al = (alpha params)
+                                                      H.insert qT key (oldv+al*(val-oldv))
                                                       b <- H.lookup qT key
                                                       return qT
-                                                      where al = (alpha params)
 
 pickAction g numA qT = do rNum         <- randomIO :: IO Double
                           rInt         <- randomIO :: IO Int
@@ -80,6 +74,7 @@ pickAction g numA qT = do rNum         <- randomIO :: IO Double
 
 pickAction' g numA qT rNum rInt
     | rNum < ep  = do print "Exploring"
+		      let action1 = (rInt `mod` numA) + 1 
                       return (qT, action1)
     | otherwise  = do (qT, qVals) <- checkQs g [1..numA] qT []
                       print (zip [1..] (reverse qVals))
@@ -89,15 +84,13 @@ pickAction' g numA qT rNum rInt
                       action2     <- bestAction maxA (length maxA) rInt
                       print "Exploiting"
                       return (qT, action2)
-                      where action1 = (rInt `mod` numA) + 1
-                            ep      = (eps params)
+                   where ep = (eps params)
 
 
-bestAction maxA len rInt = return (head action)
-                           where maxAz = zip [1..] maxA
-                                 ranIdx = (rInt `mod` len) + 1
-                                 action = [a | (idx,a) <- maxAz, idx==ranIdx]
-
+bestAction maxA len rInt = do let maxAz  = zip [1..] maxA
+                              let ranIdx = (rInt `mod` len) + 1
+                              let action = [a | (idx,a) <- maxAz, idx==ranIdx]  
+                              return (head action)
 
 checkQs _ []     qT xs = return (qT, xs)
 checkQs s (a:as) qT xs = do (qT, val) <- getQ s a qT

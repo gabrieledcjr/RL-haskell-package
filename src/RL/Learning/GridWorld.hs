@@ -17,27 +17,20 @@ sp   = '.'
 
 --cols = 10
 --rows = 7
---gridWorld = [ sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp
---            , sp, sp, sp, sp, sp, sp, sp, sp, sp, sp]
 --goal  = 9
 --start = 60
 
 cols = 5
 rows = 5 
-gridWorld = [ sp, sp, sp, sp, sp
-            , sp, sp, sp, sp, sp
-            , sp, sp, sp, sp, sp
-            , sp, sp, sp, sp, sp
-            , sp, sp, sp, sp, sp]
 goal  = 4
 start = 20
+
 --nDelay = 250000
-nDelay = 80000
+--nDelay = 80000
+nDelay = 0
+
+-- creates Gridworld
+gridWorld = [ sp | repeat <- [1..(cols*rows)] ]
 
 -- c(columns), r(rows), cur(current), gl(goal)
 data World = World{state :: [Char], -- state of the world
@@ -48,16 +41,14 @@ data World = World{state :: [Char], -- state of the world
                    deriving (Show, Eq, Ord)
 
 
-up    = 1
-down  = 2
-left  = 3
-right = 4
-actions = [up, down, left, right]
+up       = 1
+down     = 2
+left     = 3
+right    = 4
+actions  = [up, down, left, right]
 nactions = 4
 
-testActions = [left, down, up, up, right, right, right, right, right, left, right, right, up, up, up, up, right, right, right]
-
-limit = 100
+limit = 5000
 
 -- print GridWorld
 printGrid [] _    = putStrLn " "
@@ -82,7 +73,7 @@ train 0    _   = putStrLn "Program ends"
 train reps len = do print   ("REPS", reps)
                     qT <- Q.qLearn
                     trainEp len qT []
-                    train   (reps - 1) len
+                    train   (reps-1) len
 
 trainEp 0      _  scores = do print scores
                               putStrLn "End training"
@@ -90,16 +81,16 @@ trainEp length qT scores = do printf "%s %d\n" "Start Episode #" length
                               world <- setup gridWorld start goal
                               printGrid (state world) (c world)
                               delay nDelay
-                              (qT, score) <- episode' world qT (state world) 0 0 0 limit
+                              (qT, score) <- episode' world qT (state world) 0 0 0
                               printf "%s %f\n" "Score: " score
                               delay (nDelay+800000)
                               putStrLn "End episode"
                               list <- H.toList qT
                               print list
-                              trainEp (length - 1) qT (score:scores)
+                              trainEp (length-1) qT (score:scores)
 
 -- episode function
-episode' w qT lState lAction r score limit
+episode' w qT lState lAction r score
     | isGoal (cur w)    = do printf "%s %f\n" "REWARD: " (r::Double)
                              putStrLn "Win"
                              qT <- Q.learn lState lAction r (state w) qT nactions
@@ -110,7 +101,7 @@ episode' w qT lState lAction r score limit
                              w       <- step w a
                              printGrid (state w) (c w)
                              printf "%s %f\n" "REWARD: " (r::Double)
-                             episode' w qT (state w) a r (r+score) (limit-1)
+                             episode' w qT (state w) a r (r+score)
     | otherwise         = do (qT, a) <- Q.pickAction (state w) nactions qT
                              qT      <- Q.learn lState lAction r (state w) qT nactions
                              printf "%s %s\n" "MOVE: " (strAction a)
@@ -118,7 +109,7 @@ episode' w qT lState lAction r score limit
                              printGrid (state w) (c w)
                              printf "%s %f\n" "REWARD: " (r::Double)
                              delay nDelay
-                             episode' w qT (state w) a r (r+score) (limit-1)
+                             episode' w qT (state w) a r (r+score)
                           where r = getReward (cur w)
 
 
