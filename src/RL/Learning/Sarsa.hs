@@ -1,5 +1,5 @@
---module RL.Learning.QLearning
-module QLearning
+--module RL.Learning.Sarsa
+module Sarsa
 ( Params
 , State
 , Action
@@ -31,7 +31,7 @@ type Action = String
 
 
 initV  = 0.0
-params = Params {alpha=0.2, gamma=0.8, tau=0.9, eps=0.3}
+params = Params {alpha=0.2, gamma=0.99, tau=0.9, eps=0.1}
 
 -- Program can only work with known state space
 -- Load all state space in a list and convert it to Data.Map
@@ -46,17 +46,15 @@ createQT = do qT <- H.new
 
 -- s1(current state), a1(current action), 
 -- r(reward), s2(next state)
-learn s1 a1 r s2 qT numA = do (qT, qVals)  <- checkQs s2 numA qT []
-                              print (zip [1..] qVals)
-                              (maxA, maxQ) <- getMax (zip [1..] qVals) 0 []
-			      let gm = (gamma params)
-                              qT           <- learnQ s1 a1 (r+gm*maxQ) qT
-                              return qT
+learn s1 a1 r s2 qT numA a2 = do (qT, qVals)  <- checkQs s2 numA qT
+			         let qNext = head [ qVal | qVal <- qVals, i <- [1..], i == a2 ]
+                                 print (zip [1..] qVals)
+			         let gm = (gamma params)
+                                 qT           <- learnQ s1 a1 (r+gm*qNext) qT
+                                 return qT
 
 learnQ s a val qT = do qVal <- H.lookup qT key
                        qT   <- updateQ qVal qT
-		       print key
-		       print val
                        return qT
                        where key = (show a) ++ s
                              updateQ qVal qT = 
@@ -65,11 +63,11 @@ learnQ s a val qT = do qVal <- H.lookup qT key
                                                       return qT
                                       Just oldv -> do let al = (alpha params)
                                                       H.insert qT key (oldv+al*(val-oldv))
-                                                      b <- H.lookup qT key
                                                       return qT
 
-pickAction g numA qT = do rNum         <- randomIO :: IO Double
-                          rInt         <- randomIO :: IO Int
+pickAction g numA qT = do s <- newStdGen
+	                  let rNum = head (randoms s :: [Double])
+		          let rInt = head (randoms s :: [Int])
                           (qT, action) <- pickAction' g numA qT rNum rInt
                           return (qT, action)
 
@@ -77,9 +75,8 @@ pickAction' g numA qT rNum rInt
     | rNum < ep  = do print "Exploring"
 		      let action1 = (rInt `mod` numA) + 1 
                       return (qT, action1)
-    | otherwise  = do (qT, qVals) <- checkQs g numA qT []
-                      (maxA,_)    <- getMax (zip [1..] qVals) 0 []
-                      print maxA
+    | otherwise  = do (qT, qVals) <- checkQs g numA qT
+                      let (maxA,_) = getMax (zip [1..] qVals) 0
                       rInt        <- randomIO :: IO Int
                       action2     <- bestAction maxA (length maxA) rInt
                       print "Exploiting"
@@ -92,9 +89,10 @@ bestAction maxA len rInt = do let maxAz  = zip [1..] maxA
                               let action = [a | (idx,a) <- maxAz, idx==ranIdx]  
                               return (head action)
 
-checkQs _ 0    qT xs = return (qT, xs)
-checkQs s numA qT xs = do (qT, val) <- getQ s numA qT
-                          checkQs s (numA-1) qT (val:xs)
+checkQs  s numA qT    = checkQs' s numA qT []
+checkQs' _ 0    qT xs = return (qT, xs)
+checkQs' s numA qT xs = do (qT, val) <- getQ s numA qT
+                           checkQs' s (numA-1) qT (val:xs)
 
 getQ s a qT = do qVal        <- H.lookup qT key
                  (qT, qVal') <- checkQT qVal qT
@@ -105,13 +103,13 @@ getQ s a qT = do qVal        <- H.lookup qT key
                                                        return (qT, initV)
                                          Just x  -> return (qT, x)
 
-
-getMax []     max maxA = return (maxA, max)
-getMax (x:xs) max maxA
+getMax  xs     max      = getMax' xs max []
+getMax' []     max maxA = (maxA, max)
+getMax' (x:xs) max maxA
     | maxA == [] ||
-      max  == val   = getMax xs val (idx:maxA)
-    | max  <  val   = getMax xs val (idx:[])
-    | otherwise     = getMax xs max maxA
+      max  == val   = getMax' xs val (idx:maxA)
+    | max  <  val   = getMax' xs val (idx:[])
+    | otherwise     = getMax' xs max maxA
                       where val = snd x
                             idx = fst x
 

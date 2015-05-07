@@ -7,7 +7,7 @@ import Text.Printf
 import Control.Monad
 import Control.Concurrent.Thread.Delay
 import Control.Lens  -- replace element
-import qualified QLearning as Q
+import qualified TDControl as AI
 import qualified Data.HashTable.IO as H
 
 --data Cell = Cell { x :: Int, y :: Int } deriving (Show, Eq, Ord)
@@ -20,14 +20,19 @@ sp   = '.'
 --goal  = 9
 --start = 60
 
+--cols = 10
+--rows = 10
+--goal = 9
+--start = 90
+
 cols = 5
 rows = 5 
 goal  = 4
 start = 20
 
 --nDelay = 250000
---nDelay = 80000
-nDelay = 0
+nDelay = 10000
+--nDelay = 0
 
 -- creates Gridworld
 gridWorld = [ sp | repeat <- [1..(cols*rows)] ]
@@ -71,7 +76,7 @@ setup xs s g = do t1 <- updateWorld xs s '*'
 -- train function
 train 0    _   = putStrLn "Program ends"
 train reps len = do print   ("REPS", reps)
-                    qT <- Q.qLearn
+		    qT <- AI.qLearn
                     trainEp len qT []
                     train   (reps-1) len
 
@@ -93,23 +98,25 @@ trainEp length qT scores = do printf "%s %d\n" "Start Episode #" length
 episode' w qT lState lAction r score
     | isGoal (cur w)    = do printf "%s %f\n" "REWARD: " (r::Double)
                              putStrLn "Win"
-                             qT <- Q.learn lState lAction r (state w) qT nactions
+			     (qT, a) <- AI.pickAction (state w) nactions qT
+			     qT <- AI.learn lState lAction r (state w) qT nactions 0
                              return (qT, score+r)
-    | limit   == 0      = return (qT, score+r)
-    | lAction == 0      = do (qT, a) <- Q.pickAction lState nactions qT
+--    | limit   == 0      = return (qT, score+r)
+    | lAction == 0      = do (qT, a) <- AI.pickAction lState nactions qT
                              printf "%s %s\n" "MOVE: " (strAction a)
                              w       <- step w a
                              printGrid (state w) (c w)
                              printf "%s %f\n" "REWARD: " (r::Double)
-                             episode' w qT (state w) a r (r+score)
-    | otherwise         = do (qT, a) <- Q.pickAction (state w) nactions qT
-                             qT      <- Q.learn lState lAction r (state w) qT nactions
+                             episode' w qT lState a r (r+score)
+    | otherwise         = do (qT, a) <- AI.pickAction (state w) nactions qT
+			     qT      <- AI.learn lState lAction r (state w) qT nactions 0
                              printf "%s %s\n" "MOVE: " (strAction a)
+		             let lState = (state w)
                              w       <- step w a
                              printGrid (state w) (c w)
                              printf "%s %f\n" "REWARD: " (r::Double)
                              delay nDelay
-                             episode' w qT (state w) a r (r+score)
+                             episode' w qT lState a r (r+score)
                           where r = getReward (cur w)
 
 
@@ -118,10 +125,8 @@ updateWorld xs idx val = return world
 
 
 step w a = do t1 <- updateWorld (state w) (cur w) sp
-              -- check if is win
               t2 <- updateWorld t1 s' '*'
               return (World{state=t2, c=(c w), r=(r w), cur=s', gl=(gl w)})
-              --return (t2,s')
               where s' = getIndex a (cur w)
 
 isGoal s = if s == goal then True else False
