@@ -1,11 +1,10 @@
 --module RL.Learning.TDControl
 module TDControl
 ( Params
-, State
-, Action
 , qLearn
 , pickAction
 , learn
+, HashTable
 --, myGlobalVar
 --, createHash
 ) where
@@ -23,11 +22,8 @@ data Params = Params { alpha :: Double     -- learning rate
                      , tau   :: Double     -- decay
                      , eps   :: Double     -- exploration rate
                      } deriving (Show, Eq, Ord)
-data Key = Key State | KeyPair State Action deriving (Eq, Ord, Show, Read)
 
 type HashTable k v = H.BasicHashTable k v
-type State  = String
-type Action = String
 
 
 initV  = 0.0

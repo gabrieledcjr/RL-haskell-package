@@ -38,11 +38,11 @@ nDelay = 10000
 gridWorld = [ sp | repeat <- [1..(cols*rows)] ]
 
 -- c(columns), r(rows), cur(current), gl(goal)
-data World = World{state :: [Char], -- state of the world
-                      c  :: Int,    -- columns
-                      r  :: Int,    -- rows
-                    cur  :: Int,    -- current pose of agent
-                     gl  :: Int}    -- goal pose
+data World = World {state :: [Char], -- state of the world
+                   ,c     :: Int,    -- columns
+                   ,r     :: Int,    -- rows
+                   ,cur   :: Int,    -- current pose of agent
+                   ,gl    :: Int}    -- goal pose
                    deriving (Show, Eq, Ord)
 
 
